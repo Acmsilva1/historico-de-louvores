@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DIAS_LANCAR } from "@/lib/culto-dias";
-import { parseManualLouvor } from "@/lib/parse-manual-louvor";
+import { manualLouvorFromFields } from "@/lib/parse-manual-louvor";
 import { dateInWeek, fmtBr } from "@/lib/week";
 import type { CultoTipo } from "@/lib/types";
 
@@ -51,7 +51,8 @@ export function LancarContent() {
     if (dia) return dateInWeek(new Date(), dia.weekday);
     return new Date().toISOString().slice(0, 10);
   });
-  const [q, setQ] = useState("");
+  const [numeroInput, setNumeroInput] = useState("");
+  const [tituloInput, setTituloInput] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [msg, setMsg] = useState("");
@@ -74,19 +75,51 @@ export function LancarContent() {
   const diaAtual = DIAS_LANCAR.find((d) => d.tipo === tipo);
   const domingoAtivo = diaAtual?.parent === "domingo" || tipo === "domingo_ebd" || tipo === "culto_noite";
 
-  async function search(value: string) {
-    setQ(value);
-    if (!value.trim()) {
+  const hasDraftInput = Boolean(numeroInput.trim() || tituloInput.trim());
+
+  useEffect(() => {
+    const n = numeroInput.trim();
+    const t = tituloInput.trim();
+    if (!n && !t) {
       setHits([]);
       setSearching(false);
       return;
     }
-    setSearching(true);
-    const res = await fetch(`/api/louvores/search?q=${encodeURIComponent(value)}&stats=1`);
-    setSearching(false);
-    if (!res.ok) return;
-    const json = await res.json();
-    setHits(json.items || []);
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      const q = t || n;
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/louvores/search?q=${encodeURIComponent(q)}&stats=1`,
+          { signal: controller.signal },
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        let items: SearchHit[] = json.items || [];
+        if (n && t) {
+          const numLower = n.toLowerCase();
+          items = items.filter((h) => (h.numero || "").trim().toLowerCase() === numLower);
+        }
+        setHits(items);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 280);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [numeroInput, tituloInput]);
+
+  function clearDraftFields() {
+    setNumeroInput("");
+    setTituloInput("");
+    setHits([]);
   }
 
   function addHit(hit: SearchHit) {
@@ -99,13 +132,12 @@ export function LancarContent() {
         stats: hit.stats,
       },
     ]);
-    setQ("");
-    setHits([]);
+    clearDraftFields();
   }
 
   function addManual(e?: FormEvent) {
     e?.preventDefault();
-    const parsed = parseManualLouvor(q);
+    const parsed = manualLouvorFromFields(numeroInput, tituloInput);
     if (!parsed) return;
     setItems((prev) => [
       ...prev,
@@ -115,12 +147,14 @@ export function LancarContent() {
         titulo: parsed.titulo,
       },
     ]);
-    setQ("");
-    setHits([]);
+    clearDraftFields();
   }
 
-  const manualPreview = useMemo(() => parseManualLouvor(q), [q]);
-  const showManualAdd = Boolean(q.trim() && !searching);
+  const manualPreview = useMemo(
+    () => manualLouvorFromFields(numeroInput, tituloInput),
+    [numeroInput, tituloInput],
+  );
+  const showManualAdd = hasDraftInput && !searching;
 
   const hasWarn = useMemo(() => items.some((i) => i.stats?.recente), [items]);
 
@@ -215,17 +249,40 @@ export function LancarContent() {
       <div className="card space-y-3 p-4">
         <h2 className="text-lg font-semibold">2. Monte a lista</h2>
         <form onSubmit={addManual} className="space-y-2">
-          <input
-            className="input"
-            value={q}
-            onChange={(e) => search(e.target.value)}
-            placeholder="Número, título ou ex.: 42 · Nome do louvor"
-            autoComplete="off"
-          />
+          <div className="grid gap-2 sm:grid-cols-[minmax(5.5rem,7rem)_1fr]">
+            <label className="space-y-1 text-sm block">
+              <span className="text-[var(--muted)]">Número</span>
+              <input
+                className="input"
+                value={numeroInput}
+                onChange={(e) => setNumeroInput(e.target.value)}
+                placeholder="ex. 42"
+                inputMode="numeric"
+                autoComplete="off"
+              />
+            </label>
+            <label className="space-y-1 text-sm block">
+              <span className="text-[var(--muted)]">Nome / título</span>
+              <input
+                className="input"
+                value={tituloInput}
+                onChange={(e) => setTituloInput(e.target.value)}
+                placeholder="Comece a digitar para buscar"
+                autoComplete="off"
+              />
+            </label>
+          </div>
           {showManualAdd ? (
             <button type="submit" className="btn secondary" style={{ width: "auto" }}>
               {hits.length === 0
-                ? `Adicionar manualmente${manualPreview?.numero ? ` (${manualPreview.numero})` : ""}`
+                ? manualPreview
+                  ? `Adicionar manualmente: ${
+                      manualPreview.numero &&
+                      manualPreview.titulo !== manualPreview.numero
+                        ? `${manualPreview.numero} · ${manualPreview.titulo}`
+                        : manualPreview.titulo || manualPreview.numero
+                    }`
+                  : "Adicionar manualmente"
                 : "Adicionar como novo louvor"}
             </button>
           ) : null}

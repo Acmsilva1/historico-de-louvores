@@ -1,5 +1,14 @@
 export type ManualLouvorInput = { numero: string; titulo: string };
 
+/** Monta entrada manual a partir dos campos Número e Título (pelo menos um preenchido). */
+export function manualLouvorFromFields(numero: string, titulo: string): ManualLouvorInput | null {
+  const n = numero.trim();
+  const t = titulo.trim();
+  if (!n && !t) return null;
+  if (n && !t) return { numero: n, titulo: n };
+  return { numero: n, titulo: t };
+}
+
 /** Interpreta número, título ou "123 · Nome" digitados na busca. */
 export function parseManualLouvor(raw: string): ManualLouvorInput | null {
   const q = raw.trim();
