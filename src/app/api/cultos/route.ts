@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAuth, jsonError } from "@/lib/api";
+import { jsonError } from "@/lib/api";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureLouvor, weekCultos } from "@/lib/louvores";
 
 export async function GET(req: Request) {
-  const denied = await requireAuth();
-  if (denied) return denied;
-
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") || "week";
   const date = searchParams.get("date");
@@ -54,9 +51,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const denied = await requireAuth();
-  if (denied) return denied;
-
   const body = await req.json().catch(() => null);
   if (!body?.data || !body?.tipo || !Array.isArray(body.louvores)) {
     return jsonError("payload invalido");

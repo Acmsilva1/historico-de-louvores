@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/", label: "Semana" },
@@ -12,29 +12,12 @@ const LINKS = [
 
 export function Nav() {
   const pathname = usePathname();
-  const router = useRouter();
-  if (pathname === "/login") return null;
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-  }
 
   return (
     <header className="mb-5">
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">Igreja</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Histórico de Louvores</h1>
-        </div>
-        <button
-          className="btn secondary"
-          style={{ width: "auto", padding: "0.45rem 0.8rem", fontSize: "0.85rem" }}
-          type="button"
-          onClick={logout}
-        >
-          Sair
-        </button>
+      <div className="mb-3">
+        <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">Igreja</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Histórico de Louvores</h1>
       </div>
       <nav className="nav">
         {LINKS.map((l) => (

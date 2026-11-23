@@ -37,8 +37,10 @@ function normalizeTitulo(titulo) {
 }
 
 function parseHeader(header) {
-  const h = String(header).trim().toUpperCase();
-  const dateMatch = String(header).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const raw = String(header).trim();
+  const h = raw.toUpperCase();
+  const label = h.split(/\s-\s/)[0].trim();
+  const dateMatch = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   let data = null;
   if (dateMatch) {
     const d = dateMatch[1].padStart(2, "0");
@@ -47,21 +49,21 @@ function parseHeader(header) {
     if (y.length === 2) y = `20${y}`;
     data = `${y}-${m}-${d}`;
   }
-  if (h.includes("CULTO NOITE")) return { tipo: "culto_noite", data };
-  if (h.includes("EBD")) return { tipo: "domingo_ebd", data };
-  if (h.includes("DOMINGO")) return { tipo: "domingo", data };
-  if (h.includes("SABADO") || h.includes("SÁBADO")) return { tipo: "sabado", data };
-  if (h.includes("2") && h.includes("FEIRA")) return { tipo: "2a", data };
-  if (h.includes("3") && h.includes("FEIRA")) return { tipo: "3a", data };
-  if (h.includes("4") && h.includes("FEIRA")) return { tipo: "4a", data };
-  if (h.includes("5") && h.includes("FEIRA")) return { tipo: "5a", data };
+  if (label.includes("CULTO NOITE")) return { tipo: "culto_noite", data };
+  if (label.includes("EBD")) return { tipo: "domingo_ebd", data };
+  if (label.includes("DOMINGO")) return { tipo: "domingo", data };
+  if (label.includes("SABADO") || label.includes("SÁBADO")) return { tipo: "sabado", data };
+  if (/2\s*ª/.test(label) && label.includes("FEIRA")) return { tipo: "2a", data };
+  if (/3\s*ª/.test(label) && label.includes("FEIRA")) return { tipo: "3a", data };
+  if (/4\s*ª/.test(label) && label.includes("FEIRA")) return { tipo: "4a", data };
+  if (/5\s*ª/.test(label) && label.includes("FEIRA")) return { tipo: "5a", data };
   return null;
 }
 
 function detectTipo(numero, titulo) {
   const t = String(titulo).toUpperCase();
   if (t.includes("CIAS") || String(numero || "").toUpperCase() === "CIAS") return "cias";
-  if (numero && /^\d+$/.test(String(numero))) return "hinario";
+  if (numero != null && /^\d+$/.test(String(numero))) return "hinario";
   return "outro";
 }
 
@@ -77,20 +79,43 @@ const songCols = [
   [15, 16],
 ];
 
+/** @type {Map<number, string>} */
+const lastDateByCol = new Map();
 /** @type {Map<number, {header:string, tipo:string, data:string|null, songs: any[]}>} */
 const columns = new Map();
+/** @type {Array<{header:string, tipo:string, data:string, songs: any[]}>} */
+const cultosList = [];
+
+function flushColumn(numIdx) {
+  const prev = columns.get(numIdx);
+  if (prev && prev.data && prev.songs.length) {
+    cultosList.push({
+      header: prev.header,
+      tipo: prev.tipo,
+      data: prev.data,
+      songs: [...prev.songs],
+    });
+  }
+}
 
 for (let r = 0; r < rows.length; r++) {
   const row = rows[r] || [];
+
   for (const [numIdx] of songCols) {
     const cell = row[numIdx];
     if (typeof cell === "string" && /FEIRA|SABADO|SÁBADO|DOMINGO|CULTO/i.test(cell)) {
       const parsed = parseHeader(cell);
       if (!parsed) continue;
+      let data = parsed.data;
+      if (!data && parsed.tipo === "culto_noite") {
+        data = lastDateByCol.get(numIdx) ?? null;
+      }
+      if (data) lastDateByCol.set(numIdx, data);
+      flushColumn(numIdx);
       columns.set(numIdx, {
         header: cell,
         tipo: parsed.tipo,
-        data: parsed.data,
+        data,
         songs: [],
       });
     }
@@ -103,12 +128,15 @@ for (let r = 0; r < rows.length; r++) {
     const title = row[titleIdx];
     if (!title || typeof title !== "string") continue;
     if (/FEIRA|SABADO|SÁBADO|DOMINGO|LISTA|CULTO/i.test(title)) continue;
+    if (typeof num === "string" && /FEIRA|SABADO|SÁBADO|DOMINGO|CULTO/i.test(num)) continue;
+
     const numero =
       num === null || num === undefined || String(num).toUpperCase() === "CIAS"
         ? String(num || "").toUpperCase() === "CIAS"
           ? "CIAS"
           : null
         : String(num).trim();
+
     col.songs.push({
       numero: numero === "CIAS" ? null : numero,
       titulo: title.trim(),
@@ -117,27 +145,23 @@ for (let r = 0; r < rows.length; r++) {
   }
 }
 
-// Agrupa por culto (data+tipo) na ordem das colunas encontradas
+for (const [numIdx] of songCols) flushColumn(numIdx);
+
 /** @type {Map<string, {data:string, tipo:string, titulo:string, songs:any[]}>} */
 const cultos = new Map();
-for (const col of columns.values()) {
-  if (!col.data || !col.songs.length) continue;
-  const key = `${col.data}|${col.tipo}`;
-  const cur = cultos.get(key) || {
-    data: col.data,
-    tipo: col.tipo,
-    titulo: col.header,
-    songs: [],
-  };
-  // se reaparecer o mesmo culto (planilha com blocos duplicados), substitui pela ultima lista nao vazia
-  cur.songs = col.songs;
-  cur.titulo = col.header;
-  cultos.set(key, cur);
+for (const culto of cultosList) {
+  const key = `${culto.data}|${culto.tipo}`;
+  cultos.set(key, {
+    data: culto.data,
+    tipo: culto.tipo,
+    titulo: culto.header,
+    songs: culto.songs,
+  });
 }
 
 console.log("Cultos detectados:", cultos.size);
 
-let louvorCache = new Map();
+const louvorCache = new Map();
 async function ensureLouvor(song) {
   const titulo_norm = normalizeTitulo(song.titulo);
   if (louvorCache.has(titulo_norm)) return louvorCache.get(titulo_norm);
@@ -194,4 +218,6 @@ for (const culto of cultos.values()) {
   if (cultoCount % 20 === 0) console.log(`... ${cultoCount} cultos`);
 }
 
-console.log(`OK: ${cultoCount} cultos, ${linkCount} louvores vinculados, ${louvorCache.size} louvores unicos.`);
+console.log(
+  `OK: ${cultoCount} cultos, ${linkCount} louvores vinculados, ${louvorCache.size} louvores unicos.`,
+);

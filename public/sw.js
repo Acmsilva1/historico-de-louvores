@@ -1,5 +1,5 @@
-const CACHE = "hl-shell-v1";
-const ASSETS = ["/", "/login", "/lancar", "/buscar", "/ranking", "/manifest.webmanifest"];
+const CACHE = "hl-shell-v2";
+const ASSETS = ["/", "/lancar", "/buscar", "/ranking", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
