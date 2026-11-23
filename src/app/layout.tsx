@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
+import { appBuildId } from "@/lib/build-id";
 
 export const metadata: Metadata = {
   title: "Histórico de Louvores",
@@ -24,13 +26,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body>
-        <div className="mx-auto min-h-screen max-w-3xl px-4 py-5">
+        <div className="mx-auto min-h-screen max-w-3xl px-4 py-5 pb-20">
           <Nav />
           {children}
         </div>
+        <PwaUpdateBanner />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}`,
+            __html: `window.__APP_BUILD__=${JSON.stringify(appBuildId())};`,
           }}
         />
       </body>

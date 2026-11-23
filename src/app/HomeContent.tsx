@@ -1,110 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { WeekGrid, type CultoWeek } from "@/components/WeekGrid";
-import { WeekPicker, type WeekOption } from "@/components/WeekPicker";
-import { fmtBr, mondayOf, shiftWeek } from "@/lib/week";
 
-type WeekPayload = {
-  from: string;
-  to: string;
-  cultos: CultoWeek[];
-};
+const OPTIONS = [
+  {
+    href: "/historico",
+    title: "Histórico",
+    desc: "Veja e edite os cultos da semana",
+    icon: "📅",
+  },
+  {
+    href: "/lancar",
+    title: "Novo lançamento",
+    desc: "Registre louvores de um culto novo",
+    icon: "✨",
+  },
+  {
+    href: "/buscar",
+    title: "Buscar",
+    desc: "Encontre louvores no catálogo",
+    icon: "🔍",
+  },
+  {
+    href: "/ranking",
+    title: "Ranking",
+    desc: "Louvores mais cantados",
+    icon: "📊",
+  },
+] as const;
 
 export function HomeContent() {
-  const searchParams = useSearchParams();
-  const semanaParam = searchParams.get("semana");
-
-  const defaultMonday = useMemo(
-    () => mondayOf(new Date()).toISOString().slice(0, 10),
-    [],
-  );
-
-  const [monday, setMonday] = useState(semanaParam || defaultMonday);
-  const [data, setData] = useState<WeekPayload | null>(null);
-  const [weeks, setWeeks] = useState<WeekOption[]>([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const loadWeek = useCallback(async (anchorMonday: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      const r = await fetch(`/api/cultos?mode=week&date=${anchorMonday}`);
-      if (!r.ok) throw new Error("falha");
-      setData(await r.json());
-    } catch {
-      setError("Não foi possível carregar a semana.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/cultos?mode=weeks&limit=96")
-      .then((r) => r.json())
-      .then((json) => setWeeks(json.weeks || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const m = semanaParam || defaultMonday;
-    setMonday(m);
-    loadWeek(m);
-  }, [semanaParam, defaultMonday, loadWeek]);
-
-  function pickWeek(from: string) {
-    setMonday(from);
-    const url = new URL(window.location.href);
-    url.searchParams.set("semana", from);
-    window.history.replaceState(null, "", url.pathname + url.search);
-    loadWeek(from);
-  }
-
-  const label =
-    data && !loading ? `${fmtBr(data.from)} — ${fmtBr(data.to)}` : "Carregando…";
-
   return (
-    <main className="space-y-4">
-      <div className="card space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-[var(--muted)]">Histórico da semana</p>
-            <p className="text-lg font-medium">{label}</p>
-          </div>
-          <Link href="/lancar" className="btn" style={{ width: "auto", flexShrink: 0 }}>
-            Lançar
+    <main className="space-y-5">
+      <p className="text-[var(--muted)] text-base leading-relaxed">
+        Escolha uma opção para começar.
+      </p>
+      <div className="hub-grid">
+        {OPTIONS.map((opt) => (
+          <Link key={opt.href} href={opt.href} className="hub-card card">
+            <span className="hub-card-icon" aria-hidden>
+              {opt.icon}
+            </span>
+            <div className="hub-card-body">
+              <h2 className="hub-card-title">{opt.title}</h2>
+              <p className="hub-card-desc">{opt.desc}</p>
+            </div>
+            <span className="hub-card-chevron" aria-hidden>
+              ›
+            </span>
           </Link>
-        </div>
-
-        <WeekPicker
-          monday={monday}
-          weeks={weeks}
-          onPick={pickWeek}
-          onPrev={() => pickWeek(shiftWeek(monday, -1))}
-          onNext={() => pickWeek(shiftWeek(monday, 1))}
-        />
-
-        {!loading && monday !== defaultMonday ? (
-          <button
-            type="button"
-            className="text-sm text-[var(--accent)]"
-            onClick={() => pickWeek(defaultMonday)}
-          >
-            Voltar para semana atual
-          </button>
-        ) : null}
+        ))}
       </div>
-
-      {error ? <p className="text-[var(--danger)]">{error}</p> : null}
-
-      {loading ? (
-        <div className="card p-5 text-[var(--muted)]">Carregando cultos…</div>
-      ) : (
-        <WeekGrid cultos={data?.cultos || []} weekMonday={data?.from} />
-      )}
     </main>
   );
 }

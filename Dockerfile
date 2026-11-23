@@ -7,7 +7,10 @@ FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ARG APP_BUILD_ID=dev
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_APP_BUILD_ID=$APP_BUILD_ID
+ENV APP_BUILD_ID=$APP_BUILD_ID
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { DIAS_LANCAR, SLOTS_SEMANA } from "@/lib/culto-dias";
 import { dateInWeek, fmtBr } from "@/lib/week";
+import type { CultoTipo } from "@/lib/types";
 
 type CultoLouvor = {
   id: string;
@@ -17,12 +18,19 @@ export type CultoWeek = {
   culto_louvor: CultoLouvor[];
 };
 
+type EditSlotPayload = {
+  data: string;
+  tipo: CultoTipo;
+  label: string;
+};
+
 type Props = {
   cultos: CultoWeek[];
   weekMonday?: string;
+  onEdit?: (slot: EditSlotPayload) => void;
 };
 
-export function WeekGrid({ cultos, weekMonday }: Props) {
+export function WeekGrid({ cultos, weekMonday, onEdit }: Props) {
   const byTipo = new Map<string, CultoWeek>();
   for (const c of cultos) {
     byTipo.set(c.tipo, c);
@@ -40,7 +48,7 @@ export function WeekGrid({ cultos, weekMonday }: Props) {
         const fallbackDate =
           weekMonday && dia ? dateInWeek(new Date(weekMonday + "T12:00:00"), dia.weekday) : null;
         const dataParam = c?.data || fallbackDate;
-        const editHref = dataParam
+        const lancarHref = dataParam
           ? `/lancar?data=${dataParam}&tipo=${encodeURIComponent(slot.tipo)}`
           : `/lancar?tipo=${encodeURIComponent(slot.tipo)}`;
 
@@ -63,9 +71,25 @@ export function WeekGrid({ cultos, weekMonday }: Props) {
                 ))}
               </ol>
             )}
-            <Link href={editHref} className="week-cell-link">
-              {c ? "Editar" : "Lançar"}
-            </Link>
+            {c && onEdit && dataParam ? (
+              <button
+                type="button"
+                className="week-cell-link touch-target-inline text-left"
+                onClick={() =>
+                  onEdit({
+                    data: dataParam,
+                    tipo: slot.tipo as CultoTipo,
+                    label: slot.short,
+                  })
+                }
+              >
+                Editar
+              </button>
+            ) : (
+              <Link href={lancarHref} className="week-cell-link touch-target-inline">
+                Lançar
+              </Link>
+            )}
           </section>
         );
       })}

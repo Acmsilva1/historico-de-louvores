@@ -1,13 +1,25 @@
-const CACHE = "hl-shell-v2";
-const ASSETS = ["/", "/lancar", "/buscar", "/ranking", "/manifest.webmanifest"];
+const BUILD = "dev";
+const CACHE = "hl-shell-" + BUILD;
+const ASSETS = ["/", "/historico", "/lancar", "/buscar", "/ranking", "/manifest.webmanifest"];
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).catch(() => {}),
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("hl-shell-") && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 
