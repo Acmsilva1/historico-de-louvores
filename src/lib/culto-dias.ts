@@ -39,3 +39,12 @@ export function labelTipo(tipo: string): string {
   if (tipo === "domingo") return "Domingo";
   return tipo;
 }
+
+export function shortTipo(tipo: string): string {
+  const slot = SLOTS_SEMANA.find((s) => s.tipo === tipo);
+  if (slot) return slot.short;
+  const dia = DIAS_LANCAR.find((d) => d.tipo === tipo);
+  if (dia) return dia.short;
+  if (tipo === "domingo") return "Dom";
+  return tipo;
+}

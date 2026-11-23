@@ -58,6 +58,9 @@ export function LancarContent() {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [cultoId, setCultoId] = useState<string | null>(null);
+  const [loadingCulto, setLoadingCulto] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (paramTipo && TIPOS_VALIDOS.has(paramTipo as CultoTipo)) {
@@ -65,6 +68,64 @@ export function LancarContent() {
     }
     if (paramData) setData(paramData);
   }, [paramTipo, paramData]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    async function loadCulto() {
+      setLoadingCulto(true);
+      setMsg("");
+      try {
+        const res = await fetch(
+          `/api/cultos?mode=culto&date=${encodeURIComponent(data)}&tipo=${encodeURIComponent(tipo)}`,
+          { signal: controller.signal },
+        );
+        if (cancelled) return;
+        if (res.status === 404) {
+          setCultoId(null);
+          setItems([]);
+          return;
+        }
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          culto: {
+            id: string;
+            culto_louvor: Array<{
+              id: string;
+              ordem: number;
+              louvor: { numero: string | null; titulo: string } | null;
+            }>;
+          };
+        };
+        const culto = json.culto;
+        if (!culto) {
+          setCultoId(null);
+          setItems([]);
+          return;
+        }
+        setCultoId(culto.id);
+        const sorted = [...(culto.culto_louvor || [])].sort((a, b) => a.ordem - b.ordem);
+        setItems(
+          sorted.map((cl, i) => ({
+            key: cl.id || `loaded-${i}`,
+            numero: cl.louvor?.numero || "",
+            titulo: cl.louvor?.titulo || "",
+          })),
+        );
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+      } finally {
+        if (!cancelled) setLoadingCulto(false);
+      }
+    }
+
+    void loadCulto();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [data, tipo]);
 
   function selectDia(next: CultoTipo) {
     setTipo(next);
@@ -159,7 +220,7 @@ export function LancarContent() {
   const hasWarn = useMemo(() => items.some((i) => i.stats?.recente), [items]);
 
   async function salvar() {
-    if (!items.length) {
+    if (!items.length && !cultoId) {
       setMsg("Adicione ao menos um louvor.");
       return;
     }
@@ -183,8 +244,29 @@ export function LancarContent() {
       setMsg(err.error || "Falha ao salvar");
       return;
     }
-    setMsg("Culto salvo.");
+    const json = await res.json().catch(() => null);
+    if (json?.culto?.id) setCultoId(json.culto.id);
+    setMsg(cultoId ? "Alterações salvas." : "Culto salvo.");
+  }
+
+  async function excluirCulto() {
+    if (!cultoId) return;
+    if (!window.confirm("Excluir este culto e toda a lista de louvores?")) return;
+    setDeleting(true);
+    setMsg("");
+    const res = await fetch(
+      `/api/cultos?data=${encodeURIComponent(data)}&tipo=${encodeURIComponent(tipo)}`,
+      { method: "DELETE" },
+    );
+    setDeleting(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setMsg(err.error || "Falha ao excluir");
+      return;
+    }
+    setCultoId(null);
     setItems([]);
+    setMsg("Culto excluído.");
   }
 
   const diasSemana = DIAS_LANCAR.filter((d) => !d.parent);
@@ -248,6 +330,13 @@ export function LancarContent() {
 
       <div className="card space-y-3 p-4">
         <h2 className="text-lg font-semibold">2. Monte a lista</h2>
+        {loadingCulto ? (
+          <p className="text-sm text-[var(--muted)]">Carregando culto salvo…</p>
+        ) : cultoId ? (
+          <p className="text-sm text-[var(--muted)]">
+            Editando culto existente — remova itens com × ou salve as alterações.
+          </p>
+        ) : null}
         <form onSubmit={addManual} className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-[minmax(5.5rem,7rem)_1fr]">
             <label className="space-y-1 text-sm block">
@@ -360,9 +449,26 @@ export function LancarContent() {
 
       <div className="card p-4 space-y-3">
         <h2 className="text-lg font-semibold">3. Salvar</h2>
-        <button className="btn" disabled={saving || items.length === 0} onClick={salvar}>
-          {saving ? "Salvando…" : "Salvar culto"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="btn"
+            disabled={saving || loadingCulto || (!items.length && !cultoId)}
+            onClick={salvar}
+          >
+            {saving ? "Salvando…" : cultoId ? "Salvar alterações" : "Salvar culto"}
+          </button>
+          {cultoId ? (
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ width: "auto" }}
+              disabled={deleting || saving}
+              onClick={excluirCulto}
+            >
+              {deleting ? "Excluindo…" : "Excluir culto"}
+            </button>
+          ) : null}
+        </div>
         {msg ? <p className="text-sm text-[var(--muted)]">{msg}</p> : null}
       </div>
     </main>

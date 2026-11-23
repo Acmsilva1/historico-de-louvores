@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { ensureLouvor, listWeeks, weekCultos } from "@/lib/louvores";
+import {
+  cultoByDataTipo,
+  deleteCultoByDataTipo,
+  ensureLouvor,
+  listWeeks,
+  weekCultos,
+} from "@/lib/louvores";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,6 +23,19 @@ export async function GET(req: Request) {
   if (mode === "weeks") {
     const weeks = await listWeeks(Number(searchParams.get("limit") || 48));
     return NextResponse.json({ weeks });
+  }
+
+  if (mode === "culto" && date) {
+    const tipo = searchParams.get("tipo");
+    if (!tipo) return jsonError("tipo obrigatorio");
+    try {
+      const culto = await cultoByDataTipo(date, tipo);
+      if (!culto) return jsonError("culto nao encontrado", 404);
+      return NextResponse.json({ culto });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "erro";
+      return jsonError(msg, 500);
+    }
   }
 
   if (mode === "day" && date) {
@@ -62,19 +81,36 @@ export async function POST(req: Request) {
   }
 
   const db = supabaseAdmin();
-  const { data: culto, error } = await db
-    .from("culto")
-    .upsert(
-      {
-        data: body.data,
+  const existing = await cultoByDataTipo(body.data, body.tipo);
+  let culto;
+  if (existing) {
+    const { data: updated, error } = await db
+      .from("culto")
+      .update({
         tipo: body.tipo,
         titulo: body.titulo || null,
-      },
-      { onConflict: "data,tipo" },
-    )
-    .select("*")
-    .single();
-  if (error) return jsonError(error.message, 500);
+      })
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) return jsonError(error.message, 500);
+    culto = updated;
+  } else {
+    const { data: created, error } = await db
+      .from("culto")
+      .upsert(
+        {
+          data: body.data,
+          tipo: body.tipo,
+          titulo: body.titulo || null,
+        },
+        { onConflict: "data,tipo" },
+      )
+      .select("*")
+      .single();
+    if (error) return jsonError(error.message, 500);
+    culto = created;
+  }
 
   await db.from("culto_louvor").delete().eq("culto_id", culto.id);
 
@@ -104,4 +140,20 @@ export async function POST(req: Request) {
     .single();
 
   return NextResponse.json({ culto: full });
+}
+
+export async function DELETE(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const data = searchParams.get("data");
+  const tipo = searchParams.get("tipo");
+  if (!data || !tipo) return jsonError("data e tipo obrigatorios");
+
+  try {
+    const id = await deleteCultoByDataTipo(data, tipo);
+    if (!id) return jsonError("culto nao encontrado", 404);
+    return NextResponse.json({ ok: true, id });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "erro";
+    return jsonError(msg, 500);
+  }
 }

@@ -44,6 +44,18 @@ export type LouvorStats = {
   recente: boolean;
 };
 
+export type LouvorUso = {
+  data: string;
+  tipo: string;
+  tipo_label: string;
+  tipo_short: string;
+};
+
+export type LouvorHistorico = {
+  louvor_id: string;
+  usos: LouvorUso[];
+};
+
 export const CULTO_TIPO_LABEL: Record<string, string> = {
   "2a": "2ª feira",
   "3a": "3ª feira",
