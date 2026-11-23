@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { ensureLouvor, weekCultos } from "@/lib/louvores";
+import { ensureLouvor, listWeeks, weekCultos } from "@/lib/louvores";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,6 +12,11 @@ export async function GET(req: Request) {
     const anchor = date ? new Date(date + "T12:00:00") : new Date();
     const week = await weekCultos(anchor);
     return NextResponse.json(week);
+  }
+
+  if (mode === "weeks") {
+    const weeks = await listWeeks(Number(searchParams.get("limit") || 48));
+    return NextResponse.json({ weeks });
   }
 
   if (mode === "day" && date) {

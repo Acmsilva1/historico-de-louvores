@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { LouvorStats } from "@/lib/types";
 import { normalizeTitulo, detectTipo } from "@/lib/normalize";
+import { mondayOf, weekRange } from "@/lib/week";
 
 const REPETICAO_DIAS = () => Number(process.env.REPETICAO_DIAS || 14);
 
@@ -123,15 +124,7 @@ export async function louvorStats(louvorId: string): Promise<LouvorStats> {
 
 export async function weekCultos(anchor = new Date()) {
   const db = supabaseAdmin();
-  const day = anchor.getDay(); // 0=dom
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const monday = new Date(anchor);
-  monday.setDate(anchor.getDate() + mondayOffset);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const from = monday.toISOString().slice(0, 10);
-  const to = sunday.toISOString().slice(0, 10);
+  const { from, to } = weekRange(anchor);
 
   const { data: cultos } = await db
     .from("culto")
@@ -141,4 +134,26 @@ export async function weekCultos(anchor = new Date()) {
     .order("data", { ascending: true });
 
   return { from, to, cultos: cultos ?? [] };
+}
+
+export async function listWeeks(limit = 48) {
+  const db = supabaseAdmin();
+  const { data } = await db.from("culto").select("data").order("data", { ascending: false });
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const mon = mondayOf(new Date(String(row.data) + "T12:00:00")).toISOString().slice(0, 10);
+    counts.set(mon, (counts.get(mon) || 0) + 1);
+  }
+
+  const currentMon = mondayOf(new Date()).toISOString().slice(0, 10);
+  if (!counts.has(currentMon)) counts.set(currentMon, 0);
+
+  return [...counts.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, limit)
+    .map(([from, count]) => {
+      const { to } = weekRange(new Date(from + "T12:00:00"));
+      return { from, to, count };
+    });
 }
