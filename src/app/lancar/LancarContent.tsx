@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DIAS_LANCAR } from "@/lib/culto-dias";
+import { parseManualLouvor } from "@/lib/parse-manual-louvor";
 import { dateInWeek, fmtBr } from "@/lib/week";
 import type { CultoTipo } from "@/lib/types";
 
@@ -55,6 +56,7 @@ export function LancarContent() {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (paramTipo && TIPOS_VALIDOS.has(paramTipo as CultoTipo)) {
@@ -76,9 +78,12 @@ export function LancarContent() {
     setQ(value);
     if (!value.trim()) {
       setHits([]);
+      setSearching(false);
       return;
     }
+    setSearching(true);
     const res = await fetch(`/api/louvores/search?q=${encodeURIComponent(value)}&stats=1`);
+    setSearching(false);
     if (!res.ok) return;
     const json = await res.json();
     setHits(json.items || []);
@@ -98,22 +103,24 @@ export function LancarContent() {
     setHits([]);
   }
 
-  function addManual(e: FormEvent) {
-    e.preventDefault();
-    if (!q.trim()) return;
-    const numero = /^\d+$/.test(q.trim()) ? q.trim() : "";
-    const titulo = numero ? "" : q.trim();
+  function addManual(e?: FormEvent) {
+    e?.preventDefault();
+    const parsed = parseManualLouvor(q);
+    if (!parsed) return;
     setItems((prev) => [
       ...prev,
       {
         key: `m-${Date.now()}`,
-        numero,
-        titulo: titulo || q.trim(),
+        numero: parsed.numero,
+        titulo: parsed.titulo,
       },
     ]);
     setQ("");
     setHits([]);
   }
+
+  const manualPreview = useMemo(() => parseManualLouvor(q), [q]);
+  const showManualAdd = Boolean(q.trim() && !searching);
 
   const hasWarn = useMemo(() => items.some((i) => i.stats?.recente), [items]);
 
@@ -212,9 +219,23 @@ export function LancarContent() {
             className="input"
             value={q}
             onChange={(e) => search(e.target.value)}
-            placeholder="Número ou nome do louvor"
+            placeholder="Número, título ou ex.: 42 · Nome do louvor"
+            autoComplete="off"
           />
+          {showManualAdd ? (
+            <button type="submit" className="btn secondary" style={{ width: "auto" }}>
+              {hits.length === 0
+                ? `Adicionar manualmente${manualPreview?.numero ? ` (${manualPreview.numero})` : ""}`
+                : "Adicionar como novo louvor"}
+            </button>
+          ) : null}
         </form>
+
+        {showManualAdd && hits.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">
+            Não está no catálogo? Use o botão acima — ao salvar o culto, o louvor entra no catálogo.
+          </p>
+        ) : null}
 
         {hits.length > 0 ? (
           <ul className="space-y-2">

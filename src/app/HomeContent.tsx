@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { WeekGrid, type CultoWeek } from "@/components/WeekGrid";
+import { WeekPicker, type WeekOption } from "@/components/WeekPicker";
 import { fmtBr, mondayOf, shiftWeek } from "@/lib/week";
 
 type WeekPayload = {
@@ -11,8 +12,6 @@ type WeekPayload = {
   to: string;
   cultos: CultoWeek[];
 };
-
-type WeekOption = { from: string; to: string; count: number };
 
 export function HomeContent() {
   const searchParams = useSearchParams();
@@ -44,7 +43,7 @@ export function HomeContent() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/cultos?mode=weeks")
+    fetch("/api/cultos?mode=weeks&limit=96")
       .then((r) => r.json())
       .then((json) => setWeeks(json.weeks || []))
       .catch(() => {});
@@ -80,40 +79,13 @@ export function HomeContent() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn secondary icon-btn"
-            aria-label="Semana anterior"
-            onClick={() => pickWeek(shiftWeek(monday, -1))}
-          >
-            ‹
-          </button>
-          <select
-            className="select week-select"
-            value={monday}
-            onChange={(e) => pickWeek(e.target.value)}
-          >
-            {weeks.length === 0 ? (
-              <option value={monday}>{label}</option>
-            ) : (
-              weeks.map((w) => (
-                <option key={w.from} value={w.from}>
-                  {fmtBr(w.from)} — {fmtBr(w.to)}
-                  {w.count ? ` (${w.count})` : ""}
-                </option>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            className="btn secondary icon-btn"
-            aria-label="Próxima semana"
-            onClick={() => pickWeek(shiftWeek(monday, 1))}
-          >
-            ›
-          </button>
-        </div>
+        <WeekPicker
+          monday={monday}
+          weeks={weeks}
+          onPick={pickWeek}
+          onPrev={() => pickWeek(shiftWeek(monday, -1))}
+          onNext={() => pickWeek(shiftWeek(monday, 1))}
+        />
 
         {!loading && monday !== defaultMonday ? (
           <button

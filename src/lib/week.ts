@@ -24,6 +24,44 @@ export function fmtBr(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+const MESES_CURTOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
+export function fmtSemanaDe(mondayIso: string) {
+  const [, m, d] = mondayIso.split("-");
+  return `Semana de ${d}/${m}`;
+}
+
+export function monthKey(mondayIso: string) {
+  return mondayIso.slice(0, 7);
+}
+
+export function monthLabel(ym: string) {
+  const [y, m] = ym.split("-");
+  return `${MESES_CURTOS[Number(m) - 1]} ${y}`;
+}
+
+export function fmtWeekSpan(from: string, to: string) {
+  const [, fm, fd] = from.split("-");
+  const [, tm, td] = to.split("-");
+  if (fm === tm) {
+    return `${fd}–${td} ${MESES_CURTOS[Number(fm) - 1]}`;
+  }
+  return `${fd}/${fm} – ${td}/${tm}`;
+}
+
 export function shiftWeek(mondayIso: string, delta: number): string {
   const d = new Date(mondayIso + "T12:00:00");
   d.setDate(d.getDate() + delta * 7);

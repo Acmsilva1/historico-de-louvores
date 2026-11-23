@@ -142,11 +142,78 @@ a {
   background: rgba(61, 155, 253, 0.18);
 }
 
-.week-select {
+.week-picker {
+  position: relative;
+}
+
+.week-picker-trigger {
   flex: 1;
   min-width: 0;
-  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.week-picker-title {
+  display: block;
+  font-weight: 650;
+  font-size: 1rem;
+}
+
+.week-picker-sub {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+.week-picker-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 40;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: min(22rem, 55vh);
+}
+
+.week-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.week-picker-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--text);
   font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.week-picker-item:hover,
+.week-picker-item.active {
+  border-color: rgba(61, 155, 253, 0.4);
+  background: rgba(61, 155, 253, 0.12);
 }
 
 .icon-btn {
