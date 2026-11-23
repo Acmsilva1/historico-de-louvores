@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "import": "node scripts/import-excel.mjs",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "seed:generate": "python scripts/generate_seed_coletanea.py",
+    "seed:apply": "node scripts/apply-seed-coletanea.mjs",
+    "seed:coletanea": "npm run seed:generate && npm run seed:apply"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
